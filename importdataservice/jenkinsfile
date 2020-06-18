@@ -1,0 +1,45 @@
+#!/usr/bin/env groovy
+pipeline {
+	agent any
+    stages {
+       stage('Build') { 
+            steps { 
+                 sh 'mvn clean package -Dmaven.test.skip=true'
+                 echo "build finished"
+				 sh 'cp target/authservice.jar /root/fsd2020/bepackages/auth/authservice.jar'
+				 echo "copy finished"
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+				sh `
+					echo "building..."
+					VERSION=$(date +%Y%m%d%H%M%S)
+					IMAGE_NAME=yancy/authservice:${VERSION}
+					echo 'start docker build'
+					cd /root/fsd2020/bepackages/auth
+					docker login --username peixnw --password 1111111
+					docker build -t ${IMAGE_NAME} .
+					docker push ${IMAGE_NAME}
+					echo 'docker build and push finished'
+
+					echo 'deploy...'
+					docker run -p 127.0.0.1:80:8080/tcp peixnw/authservice:${VERSION} bash
+					echo 'deploy done'
+				'
+            }
+        }
+
+        
+    }
+
+    post {
+        always {
+            echo 'build and deploy finished'
+        }
+        failure {
+            echo 'build failed'
+        }
+    }
+}
